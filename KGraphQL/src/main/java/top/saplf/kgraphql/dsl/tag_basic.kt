@@ -20,8 +20,11 @@ private var tabSize = 2
  */
 abstract class Tag(val tagName: String,
                    val tagAlias: String? = null,
-                   protected val tagArgs: TagArgs = null
+                   protected val tagArgs: TagArgs = null,
+                   var treatAsFragment: Boolean = false,
+                   val identifier: String
 ) {
+
     open fun generate(level: Int): String {
         return if (format) generateFormat(level) else generateCompress(level)
     }
@@ -72,15 +75,22 @@ abstract class Tag(val tagName: String,
 }
 
 /**
- *
+ * 有标签体的标签
  * @param pureTag `true` 表示没有标签体，`false` 表示有标签体
  */
 abstract class BlockTag(
         tagName: String,
         tagArgs: TagArgs,
-        protected val pureTag: Boolean = false
-) : Tag(tagName = tagName, tagArgs = tagArgs) {
+        protected val pureTag: Boolean = false,
+        identifier: String
+) : Tag(tagName = tagName, tagArgs = tagArgs, identifier = identifier) {
+
+    /**
+     * [childTags] subField list
+     */
     private val childTags: MutableList<Any> by lazy { mutableListOf<Any>() }
+
+    private val definedFragments: MutableList<BlockTag> by lazy { mutableListOf<BlockTag>() }
 
     fun generate(): String {
         return generate(0)
@@ -94,13 +104,19 @@ abstract class BlockTag(
         val currentPrev = if (level == 0) "" else "\n"
         val currentTab = " ".repeat(tabSize * level)
 
+        // treat as fragment
+        if (treatAsFragment) {
+            return "$currentPrev$currentTab...$identifier"
+        }
+
         val bodyString = generateBodyString(level)
-        val currentBody = if (bodyString.isEmpty()) "{}" else " {$bodyString\n$currentTab}"
+        val currentBody = if (bodyString.isEmpty()) throw RuntimeException("Field with subfields can't be empty body.") else " {$bodyString\n$currentTab}"
         return "$currentPrev$currentTab$tagName${generateArgsString(true)}$currentBody"
     }
 
     override fun generateCompress(level: Int): String {
-        return "$tagName${generateArgsString(false)}{${generateBodyString(level)}}"
+        return if (treatAsFragment) "...$identifier"
+        else "$tagName${generateArgsString(false)}{${generateBodyString(level)}}"
     }
 
     protected fun <T> appendTag(tag: T, execution: T.() -> Unit = {}) where T : Tag {
@@ -116,4 +132,10 @@ abstract class BlockTag(
                 .filterIsInstance<Tag>()
                 .forEach { append(it.generate(level + 1)) }
     }.toString()
+
+    fun defineFragment(fragment: BlockTag) {
+        definedFragments.add(fragment)
+    }
 }
+
+abstract class KGraphQLField
