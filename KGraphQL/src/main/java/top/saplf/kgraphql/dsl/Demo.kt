@@ -7,17 +7,17 @@ package top.saplf.kgraphql.dsl
 class QueryNameFirst(
         tagArgs: TagArgs = null,
         identifier: String = "frag${System.nanoTime()}"
-) : Tag(tagName = "first", tagArgs = tagArgs, identifier = identifier)
+) : Tag(tagName = "First", tagArgs = tagArgs, identifier = identifier)
 
 class QueryNameSecond(
         identifier: String = "frag${System.nanoTime()}"
-) : Tag(tagName = "second", identifier = identifier)
+) : Tag(tagName = "Second", identifier = identifier)
 
 class QueryName(
         tagArgs: TagArgs = null,
         identifier: String = "frag${System.nanoTime()}",
         init: (QueryName.() -> Unit)? = null
-) : BlockTag(tagName = "name", tagArgs = tagArgs, identifier = identifier) {
+) : BlockTag(tagName = "Name", tagArgs = tagArgs, identifier = identifier) {
 
     init {
         if (init != null) {
@@ -30,38 +30,38 @@ class QueryName(
     private val keyQueryNameFirstList = "list"
 
     fun first(list: List<*>? = null) {
-        appendTag(QueryNameFirst(mapOf(keyQueryNameFirstList to list)))
+        appendTag(QueryNameFirst(mapOf(keyQueryNameFirstList to list)), "first")
     }
 
     fun second() {
-        appendTag(QueryNameSecond())
+        appendTag(QueryNameSecond(), "second")
     }
 
     infix fun on(fragment: BlockTag) {
-//        insertFragment(fragment.identifier ?: "${BlockTag::javaClass.name}${fragment.hashCode()}", fragment)
-        appendTag(fragment)
+        appendFragment(fragment, false)
+    }
+
+    infix fun flat(fragment: BlockTag) {
+        appendFragment(fragment, true)
     }
 
     @Deprecated(message = "不能在此使用", replaceWith = ReplaceWith("Unit"), level = DeprecationLevel.ERROR)
     fun name(age: Int? = null, gender: String? = null, execution: QueryName.() -> Unit) = Unit
-
-    fun fragment() {
-
-    }
 }
 
 class Query(
         tagArgs: TagArgs = null,
         identifier: String = "frag${System.nanoTime()}"
-) : BlockTag(tagName = "query", tagArgs = tagArgs, identifier = identifier) {
+) : BlockTag(tagName = "Query", tagArgs = tagArgs, identifier = identifier) {
+
     private val keyQueryNameAge = "age"
     private val keyQueryNameGender = "gender"
 
     fun name(age: Int? = null, gender: String? = null, execution: QueryName.() -> Unit) {
-        appendTag(QueryName(mapOf(
+        appendTag(tag =  QueryName(mapOf(
                 keyQueryNameAge to age,
                 keyQueryNameGender to gender
-        )), execution)
+        )), fieldName = "name", execution = execution)
     }
 
     @Deprecated(message = "不能在此使用", replaceWith = ReplaceWith("Unit"), level = DeprecationLevel.ERROR)
@@ -113,7 +113,7 @@ fun demo() {
             }
             name {
                 first()
-                this on fragmentA
+                this flat fragmentA
                 this on QueryName {
 
                 }
