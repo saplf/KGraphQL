@@ -15,13 +15,11 @@ private var tabSize = 2
 /**
  * 标签超类
  * @property tagName 标签名
- * @property tagAlias 标签别名
  * @property tagArgs 标签参数名称及值
  * @property treatAsFragment 该 [Tag] 是否应该被视为 Fragment
  * @property identifier [Tag] 唯一标识
  */
 abstract class Tag(val tagName: String,
-                   val tagAlias: String? = null,
                    protected val tagArgs: TagArgs = null,
                    var treatAsFragment: Boolean = false,
                    val identifier: String
@@ -29,29 +27,32 @@ abstract class Tag(val tagName: String,
 
     /**
      * @param level 表示当前 [Tag] 是整个表达式的第几层，用于格式化输出时打印空格
-     * @param filedName 该 [Tag] 在父级 [BlockTag] 中的 field 名
+     * @param fieldName 该 [Tag] 在父级 [BlockTag] 中的 field 名
+     * @param fieldAlias 该 [Tag] 在父级 [BlockTag] 中的别名
      * @param defineFragment 表示是否是表示 Fragment 定义
      */
-    open fun generateQuery(level: Int, filedName: String, defineFragment: Boolean = false): String {
-        return if (format) generateQueryFormat(level, filedName) else generateQueryCompress(level, filedName)
+    open fun generateQuery(level: Int, fieldName: String, fieldAlias: String?, defineFragment: Boolean = false): String {
+        return if (format) generateQueryFormat(level, fieldName, fieldAlias) else generateQueryCompress(level, fieldName, fieldAlias)
     }
 
     /**
      * 格式化输出的生成
      * @see generateQuery
      */
-    protected open fun generateQueryFormat(level: Int, filedName: String, defineFragment: Boolean = false): String {
+    protected open fun generateQueryFormat(level: Int, fieldName: String, fieldAlias: String?, defineFragment: Boolean = false): String {
         val currentPrev = if (level == 0) "" else "\n"
         val currentTab = " ".repeat(tabSize * level)
-        return "$currentPrev$currentTab$filedName${generateArgsString(true)}"
+        val currentAlias = if (fieldAlias.isNullOrEmpty()) "" else "$fieldAlias: "
+        return "$currentPrev$currentTab$currentAlias$fieldName${generateArgsString(true)}"
     }
 
     /**
      * 压缩输出
      * @see generateQuery
      */
-    protected open fun generateQueryCompress(level: Int, filedName: String, defineFragment: Boolean = false): String {
-        return "$filedName${generateArgsString(false)} "
+    protected open fun generateQueryCompress(level: Int, fieldName: String, fieldAlias: String?, defineFragment: Boolean = false): String {
+        val currentAlias = if (fieldAlias.isNullOrEmpty()) "" else "$fieldAlias:"
+        return "$currentAlias$fieldName${generateArgsString(false)} "
     }
 
     /**
@@ -105,7 +106,7 @@ abstract class BlockTag(
     /**
      * subField list
      */
-    private val childTags: MutableList<Pair<String, Tag>> by lazy { mutableListOf<Pair<String, Tag>>() }
+    private val childTags: MutableList<Triple<String, String, Tag>> by lazy { mutableListOf<Triple<String, String, Tag>>() }
 
     /**
      * 定义的 fragments
@@ -119,40 +120,57 @@ abstract class BlockTag(
      * @return 生成的查询字符串
      */
     fun generate(defineFragment: Boolean = false): String {
-        return generateQuery(0, "query", defineFragment)
+        return generateQuery(0, "query", null, defineFragment) + generateFragmentDefine()
+    }
+
+    fun generateFragmentDefine(): String {
+        return StringBuilder().apply {
+            definedFragments.forEach { append("\nfragment ${it.identifier} on ${it.generateQuery(0, it.tagName, null, true)}") }
+        }.toString()
     }
 
     /**
      * 生成
+     *
      * ```
      * query {
      *  ...
      * }
      * ```
+     *
      * 块
      */
-    override fun generateQuery(level: Int, filedName: String, defineFragment: Boolean): String {
-        return if (format) generateQueryFormat(level, filedName, defineFragment) else generateQueryCompress(level, filedName, defineFragment)
+    override fun generateQuery(level: Int, fieldName: String, fieldAlias: String?, defineFragment: Boolean): String {
+        return if (format) generateQueryFormat(level, fieldName, fieldAlias, defineFragment)
+        else generateQueryCompress(level, fieldName, fieldAlias, defineFragment)
     }
 
-    override fun generateQueryFormat(level: Int, filedName: String, defineFragment: Boolean): String {
+    override fun generateQueryFormat(level: Int, fieldName: String, fieldAlias: String?, defineFragment: Boolean): String {
         val currentPrev = if (level == 0) "" else "\n"
         val currentTab = " ".repeat(tabSize * level)
 
         // treat as fragment to flat
         if (!defineFragment && treatAsFragment) {
-            return if (fragmentNeedFlat) "$currentPrev$currentTab...on $tagName {${generateBodyString(level)}\n$currentTab}"
-            else "$currentPrev$currentTab...$identifier"
+            return if (fragmentNeedFlat) "$currentPrev$currentTab...$identifier"
+            else "$currentPrev$currentTab...on $tagName {${generateBodyString(level)}\n$currentTab}"
         }
 
         val bodyString = generateBodyString(level)
         val currentBody = if (bodyString.isEmpty()) throw RuntimeException("Field with sub fields can't be empty body.") else " {$bodyString\n$currentTab}"
-        return "$currentPrev$currentTab$filedName${generateArgsString(true)}$currentBody"
+        val currentAlias = if (fieldAlias.isNullOrEmpty()) "" else "$fieldAlias: "
+        return "$currentPrev$currentTab$currentAlias$fieldName${generateArgsString(true)}$currentBody"
     }
 
-    override fun generateQueryCompress(level: Int, filedName: String, defineFragment: Boolean): String {
-        return if (!defineFragment && treatAsFragment) "...$identifier"
-        else "$filedName${generateArgsString(false)}{${generateBodyString(level)}}"
+    override fun generateQueryCompress(level: Int, fieldName: String, fieldAlias: String?, defineFragment: Boolean): String {
+        if (!defineFragment && treatAsFragment) {
+            return if (fragmentNeedFlat) "...$identifier"
+            else "...on $tagName{${generateBodyString(level)}}"
+        }
+
+        val bodyString = generateBodyString(level)
+        val currentBody = if (bodyString.isEmpty()) throw RuntimeException("Field with sub fields can't be empty body.") else " {$bodyString}"
+        val currentAlias = if (fieldAlias.isNullOrEmpty()) "" else "$fieldAlias:"
+        return "$currentAlias$fieldName${generateArgsString(false)}$currentBody"
     }
 
     /**
@@ -161,7 +179,7 @@ abstract class BlockTag(
     private fun generateBodyString(level: Int): String
             = StringBuilder().apply {
         childTags
-                .forEach { append(it.second.generateQuery(level + 1, it.first)) }
+                .forEach { append(it.third.generateQuery(level + 1, it.first, it.second)) }
     }.toString()
 
     /**
@@ -171,11 +189,11 @@ abstract class BlockTag(
      * @param fieldName  该 [Tag] 在父级 [BlockTag] 中的 field 名
      * @param execution [tag] 需要进行的初始化操作
      */
-    protected fun <T> appendTag(tag: T, fieldName: String, execution: T.() -> Unit = {}) where T : Tag {
+    protected fun <T> appendTag(tag: T, fieldName: String, fieldAlias: String? = null, execution: T.() -> Unit = {}) where T : Tag {
         if (tag is BlockTag) {
             tag.fragmentNeedFlat = true
         }
-        childTags.add(Pair(fieldName, tag.apply(execution)))
+        childTags.add(Triple(fieldName, fieldAlias ?: "", tag.apply(execution)))
     }
 
     /**
@@ -183,8 +201,8 @@ abstract class BlockTag(
      * @see appendTag
      */
     protected fun <T> appendFragment(fragment: T, needFlat: Boolean, execution: T.() -> Unit = {}) where T : BlockTag {
-        fragment.fragmentNeedFlat = needFlat;
-        childTags.add(Pair("", fragment.apply(execution)))
+        fragment.fragmentNeedFlat = needFlat
+        childTags.add(Triple("", "", fragment.apply(execution)))
     }
 
     /**
