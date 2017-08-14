@@ -1,7 +1,5 @@
 package top.saplf.kgraphql.annotation
 
-import java.lang.annotation.RetentionPolicy
-
 /**
  * @author saplf
  */
