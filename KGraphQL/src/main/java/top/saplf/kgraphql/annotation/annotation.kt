@@ -1,12 +1,14 @@
 package top.saplf.kgraphql.annotation
 
+import java.lang.annotation.RetentionPolicy
+
 /**
  * @author saplf
  */
 
-annotation class KGraphQLName
-
-annotation class KGraphQLAlias
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.PROPERTY)
+annotation class KGraphQLName(val name: String)
 
 annotation class KGraphQLArg
 
