@@ -42,9 +42,6 @@ class QueryName(
   infix fun flat(fragment: BlockTag) {
     appendFragment(fragment, true)
   }
-
-  @Deprecated(message = "wrong scope", replaceWith = ReplaceWith("Unit"), level = DeprecationLevel.ERROR)
-  fun name(age: Int? = null, gender: String? = null, execution: QueryName.() -> Unit) = Unit
 }
 
 class Query(

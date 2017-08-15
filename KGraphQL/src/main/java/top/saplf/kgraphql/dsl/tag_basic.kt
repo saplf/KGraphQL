@@ -3,6 +3,8 @@ package top.saplf.kgraphql.dsl
 /**
  * @author saplf
  */
+@DslMarker
+annotation class KGraphQLMaker
 
 typealias TagArgs = Map<String, Any?>?
 
@@ -19,10 +21,12 @@ private var tabSize = 2
  * @property treatAsFragment 该 [Tag] 是否应该被视为 Fragment
  * @property identifier [Tag] 唯一标识
  */
-abstract class Tag(val tagName: String,
-                   protected val tagArgs: TagArgs = null,
-                   var treatAsFragment: Boolean = false,
-                   val identifier: String
+@KGraphQLMaker
+abstract class Tag(
+    val tagName: String,
+    protected val tagArgs: TagArgs = null,
+    var treatAsFragment: Boolean = false,
+    val identifier: String
 ) {
 
   /**
