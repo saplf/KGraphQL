@@ -1,6 +1,8 @@
 package top.saplf.kgraphql.processor
 
 import com.google.auto.service.AutoService
+import com.squareup.kotlinpoet.KotlinFile
+import top.saplf.kgraphql.annotation.KGraph
 import top.saplf.kgraphql.annotation.KGraphOperation
 import top.saplf.kgraphql.annotation.KGraphQLArg
 import top.saplf.kgraphql.annotation.KGraphQLName
@@ -16,8 +18,9 @@ import javax.lang.model.util.Elements
 
   private val classSet: Set<Class<out Annotation>> by lazy {
     setOf(
-        KGraphQLName::class.java,
+        KGraph::class.java,
         KGraphQLArg::class.java,
+        KGraphQLName::class.java,
         KGraphOperation::class.java
     )
   }
@@ -36,7 +39,13 @@ import javax.lang.model.util.Elements
   override fun getSupportedSourceVersion() = SourceVersion.latestSupported()!!
 
   override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment): Boolean {
-
+    KotlinFile.builder("", "HelloWorld")
+        .build()
+        .writeTo(mFiler)
     return false
+  }
+
+  private fun KotlinFile.writeTo(filer: Filer) {
+    val fileName = ""
   }
 }
